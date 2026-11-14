@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Audiobook
+Comment=Client natif pour Audible
+Icon=harbour-audiobook
+Exec=sailfish-qml harbour-audiobook
+X-Nemo-Application-Type=silica-qt5
+
+[X-Sailjail]
+Sandboxing=Disabled
