@@ -11,10 +11,6 @@ WebViewPage {
     property bool captured: false
     signal codeReceived(string url)
     allowedOrientations: Orientation.All
-    // La fleche de retour de Sailfish (en haut a gauche) captait les appuis
-    // destines aux menus des sites : on la retire, le bouton Fermer la remplace.
-    backNavigation: false
-    showNavigationIndicator: false
 
     WebView {
         id: web
