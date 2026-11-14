@@ -58,6 +58,16 @@ Page {
         onCountChanged: page.refreshing = false
     }
 
+    // La liste est reconstruite a chaque actualisation : si l'on etait en haut,
+    // on y revient, en-tete compris, au lieu de rester un peu descendu.
+    property bool wasAtTop: true
+    function scrollToTop() { list.contentY = list.originY - list.topMargin }
+    Connections {
+        target: app
+        onLibraryAboutToRebuild: page.wasAtTop = list.contentY - list.originY < Theme.itemSizeLarge
+        onLibraryRebuilt: if (page.wasAtTop) Qt.callLater(page.scrollToTop)
+    }
+
     Component.onCompleted: {
         py.call("backend.library_cached", [], function(items) {
             app.fillLibrary(items)

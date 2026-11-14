@@ -81,6 +81,10 @@ ApplicationWindow {
         return (parts[parts.length - 1] + " " + name).toLowerCase()
     }
 
+    // Signales a la page Bibliotheque pour qu'elle garde sa position en haut.
+    signal libraryAboutToRebuild()
+    signal libraryRebuilt()
+
     function rebuildLibrary() {
         var s = search.toLowerCase()
         var list = []
@@ -114,8 +118,10 @@ ApplicationWindow {
                 list[k].section = onDevice(list[k]) ? qsTr("On your phone")
                                                     : qsTr("Available to download")
         }
+        libraryAboutToRebuild()
         libraryModel.clear()
         libraryModel.append(list)
+        libraryRebuilt()
     }
 
     function indexOfAsin(asin) {

@@ -11,6 +11,7 @@ WebViewPage {
     property bool captured: false
     signal codeReceived(string url)
     allowedOrientations: Orientation.All
+    showNavigationIndicator: false
 
     WebView {
         id: web
@@ -30,35 +31,25 @@ WebViewPage {
         }
     }
 
-    ProgressBar {
-        anchors { left: parent.left; right: parent.right; top: toolbar.bottom }
+    ProgressBar {   // chargement, tout en bas de l'ecran
+        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         visible: web.loading
         indeterminate: true
         leftMargin: 0; rightMargin: 0
         height: Theme.paddingSmall
     }
 
+    // Barre du haut : deux boutons aux extremites, de part et d'autre de l'encoche.
     Rectangle {
         id: toolbar
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: Theme.itemSizeSmall
         color: Theme.rgba(Theme.overlayBackgroundColor, 0.9)
-        Row {
-            anchors.centerIn: parent
-            spacing: Theme.paddingLarge
-            IconButton {
-                icon.source: "image://theme/icon-m-close"
-                onClicked: pageStack.pop()
-            }
-            IconButton {
-                icon.source: "image://theme/icon-m-back"
-                enabled: web.canGoBack
-                onClicked: web.goBack()
-            }
-            IconButton {
-                icon.source: "image://theme/icon-m-refresh"
-                onClicked: web.reload()
-            }
+
+        IconButton {   // page precedente du site, ou retour a l'application
+            anchors { left: parent.left; leftMargin: Theme.paddingMedium; verticalCenter: parent.verticalCenter }
+            icon.source: "image://theme/icon-m-back"
+            onClicked: web.canGoBack ? web.goBack() : pageStack.pop()
         }
     }
 }
