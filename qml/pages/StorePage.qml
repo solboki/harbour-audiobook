@@ -7,20 +7,25 @@ WebViewPage {
     id: page
     property string startUrl: ""
     allowedOrientations: Orientation.All
+    // La fleche de retour de Sailfish (en haut a gauche) captait les appuis
+    // destines aux menus des sites : on la retire, le bouton Fermer la remplace.
+    backNavigation: false
+    showNavigationIndicator: false
 
     Component.onDestruction: app.storeVisited = true   // actualiser la bibliotheque au retour
 
     WebView {
         id: web
         anchors {
-            top: parent.top; left: parent.left; right: parent.right
-            bottom: toolbar.top
+            top: toolbar.bottom; left: parent.left; right: parent.right
+            bottom: parent.bottom
         }
+        z: -1
         url: page.startUrl
     }
 
     ProgressBar {
-        anchors { left: parent.left; right: parent.right; bottom: toolbar.top }
+        anchors { left: parent.left; right: parent.right; top: toolbar.bottom }
         visible: web.loading
         indeterminate: true
         leftMargin: 0; rightMargin: 0
@@ -29,7 +34,7 @@ WebViewPage {
 
     Rectangle {
         id: toolbar
-        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        anchors { left: parent.left; right: parent.right; top: parent.top }
         height: Theme.itemSizeSmall
         color: Theme.rgba(Theme.overlayBackgroundColor, 0.9)
 
