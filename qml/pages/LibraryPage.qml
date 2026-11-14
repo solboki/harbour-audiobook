@@ -37,6 +37,7 @@ Page {
     onStatusChanged: {
         if (status !== PageStatus.Active) return
         ensurePlayerAttached()
+        settleTimer.restart()
         if (app.storeVisited) {   // retour de la boutique : nouveaux achats possibles
             app.storeVisited = false
             refresh()
@@ -58,14 +59,25 @@ Page {
         onCountChanged: page.refreshing = false
     }
 
-    // La liste est reconstruite a chaque actualisation : si l'on etait en haut,
-    // on y revient, en-tete compris, au lieu de rester un peu descendu.
-    property bool wasAtTop: true
-    function scrollToTop() { list.contentY = list.originY - list.topMargin }
+    // Tant que l'utilisateur n'a pas fait defiler la liste, elle reste calee en
+    // haut, en-tete compris, quels que soient les changements de hauteur de
+    // l'en-tete ou les reconstructions du modele.
+    property bool pinTop: true
+    function keepTop() {
+        if (pinTop && !list.moving && !list.dragging)
+            list.contentY = list.originY
+    }
+    Timer { id: settleTimer; interval: 50; onTriggered: page.keepTop() }
+    Connections {
+        target: list
+        onOriginYChanged: settleTimer.restart()
+        onContentHeightChanged: settleTimer.restart()
+        onMovementStarted: page.pinTop = false
+        onMovementEnded: page.pinTop = list.contentY <= list.originY + Theme.paddingLarge
+    }
     Connections {
         target: app
-        onLibraryAboutToRebuild: page.wasAtTop = list.contentY - list.originY < Theme.itemSizeLarge
-        onLibraryRebuilt: if (page.wasAtTop) Qt.callLater(page.scrollToTop)
+        onLibraryRebuilt: settleTimer.restart()
     }
 
     Component.onCompleted: {

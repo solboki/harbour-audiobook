@@ -11,7 +11,6 @@ WebViewPage {
     property bool captured: false
     signal codeReceived(string url)
     allowedOrientations: Orientation.All
-    showNavigationIndicator: false
 
     WebView {
         id: web
@@ -39,17 +38,33 @@ WebViewPage {
         height: Theme.paddingSmall
     }
 
-    // Barre du haut : deux boutons aux extremites, de part et d'autre de l'encoche.
+    // Barre du haut. A gauche, la fleche de Sailfish (fermer la page) reste en
+    // place ; nos boutons sont places de part et d'autre de l'encoche.
     Rectangle {
         id: toolbar
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: Theme.itemSizeSmall
         color: Theme.rgba(Theme.overlayBackgroundColor, 0.9)
 
-        IconButton {   // page precedente du site, ou retour a l'application
-            anchors { left: parent.left; leftMargin: Theme.paddingMedium; verticalCenter: parent.verticalCenter }
-            icon.source: "image://theme/icon-m-back"
-            onClicked: web.canGoBack ? web.goBack() : pageStack.pop()
+        Row {   // avant l'encoche, apres la fleche de Sailfish
+            anchors { left: parent.left; leftMargin: Theme.itemSizeMedium; verticalCenter: parent.verticalCenter }
+            IconButton {
+                icon.source: "image://theme/icon-m-back"
+                enabled: web.canGoBack
+                onClicked: web.goBack()
+            }
+            IconButton {
+                icon.source: "image://theme/icon-m-forward"
+                enabled: web.canGoForward
+                onClicked: web.goForward()
+            }
+        }
+        Row {   // apres l'encoche
+            anchors { right: parent.right; rightMargin: Theme.paddingMedium; verticalCenter: parent.verticalCenter }
+            IconButton {
+                icon.source: "image://theme/icon-m-refresh"
+                onClicked: web.reload()
+            }
         }
     }
 }
