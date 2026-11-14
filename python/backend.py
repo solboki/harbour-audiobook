@@ -17,8 +17,11 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Les bibliotheques installees par « pip install --user » doivent etre visibles
-# depuis l'interpreteur embarque par PyOtherSide.
+# Modules embarques dans le paquet (dossier lib/ a cote de python/). Ils passent
+# en premier ; ceux installes par « pip install --user » restent un secours.
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lib")
+if os.path.isdir(_LIB) and _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
 try:
     _user_site = site.getusersitepackages()
     if _user_site not in sys.path:
@@ -47,7 +50,7 @@ try:
 except ImportError as e:
     MISSING.append(e.name or "snowcrypt")
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 HOME = Path.home()
 DATA = HOME / ".local/share/harbour-audiobook"
 CACHE = HOME / ".cache/harbour-audiobook"

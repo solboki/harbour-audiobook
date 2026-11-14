@@ -30,31 +30,31 @@ sync with the official Audible apps on your other devices.
 
 ## Installation
 
-The app relies on two Python modules that are not packaged for Sailfish OS.
-Install them once, as the `defaultuser` user:
+Download the RPM from the releases page and install it:
 
 ```bash
-python3 -m pip install --user audible snowcrypt
+devel-su pkcon install-local harbour-audiobook-0.7.0-1.aarch64.rpm
 ```
 
-Then install the RPM from the releases page:
+The Python modules the app needs (audible, snowcrypt and their dependencies)
+are bundled in the package, so nothing else has to be installed. The package
+targets 64-bit devices (aarch64) running Sailfish OS 5 with Python 3.11.
 
-```bash
-devel-su pkcon install-local harbour-audiobook-0.6.0-1.noarch.rpm
-```
-
-Sailjail sandboxing is disabled for now, so that the app can load the modules
-installed with pip.
+Sailjail sandboxing is disabled for now.
 
 ## Building
 
-The package is `noarch` (QML and Python only), so it builds without the
-Sailfish SDK, on any machine with `rpmbuild` and Qt's `lrelease`:
+The app itself is QML and Python, so it builds without the Sailfish SDK, on
+any machine with `rpmbuild`, `pip` and Qt's `lrelease`:
 
 ```bash
+sh tools/vendor.sh               # fetches the bundled Python modules into lib/
 python3 tools/build_ts.py        # regenerates the translation files
-rpmbuild -bb harbour-audiobook.spec
+rpmbuild --target aarch64 -bb harbour-audiobook.spec
 ```
+
+Pillow, used by the audible module only to display a CAPTCHA during password
+sign-in, is replaced by an empty stub: the app signs in through the browser.
 
 Translations live in `tools/catalog.py`, one line per text and one column per
 language. Corrections from native speakers are welcome.
@@ -87,8 +87,8 @@ bibliothèque, télécharge vos livres audio et les lit dans un lecteur Silica, 
 synchronisant la position d'écoute avec les applications officielles d'Audible
 sur vos autres appareils.
 
-Avant d'installer le paquet RPM, installez une fois les deux modules Python
-nécessaires avec `python3 -m pip install --user audible snowcrypt`.
+Le paquet RPM embarque tous les modules Python nécessaires : il s'installe
+seul, sans étape préalable.
 
 L'application n'est pas officielle et n'a aucun lien avec Audible ni Amazon.
 Elle n'accède qu'aux livres achetés sur votre propre compte.

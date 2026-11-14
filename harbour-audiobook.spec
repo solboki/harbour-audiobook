@@ -1,9 +1,14 @@
 Name:       harbour-audiobook
-Version:    0.6.0
+Version:    0.7.0
 Release:    1
 Summary:    Audiobook, client natif pour Audible sur Sailfish OS
 License:    AGPL-3.0-or-later
-BuildArch:  noarch
+# Les modules Python embarques contiennent du code compile (pycryptodome).
+BuildArch:  aarch64
+AutoReqProv: no
+%global debug_package %{nil}
+%global __strip /bin/true
+%global __os_install_post %{nil}
 URL:        https://github.com/solboki/harbour-audiobook
 Source0:    %{name}-%{version}.tar.gz
 Requires:   sailfishsilica-qt5 >= 0.10.9
@@ -14,9 +19,9 @@ Requires:   python3-base
 BuildRequires: qt5-qttools-linguist
 
 %description
-Bibliotheque Audible, telechargement, lecteur avec chapitres et
-synchronisation de la position. Necessite les modules Python audible et
-snowcrypt (python3 -m pip install --user audible snowcrypt).
+Client natif pour Audible : bibliotheque, telechargement, lecteur avec
+chapitres et synchronisation de la position. Les modules Python necessaires
+(audible, snowcrypt et leurs dependances) sont embarques.
 
 %prep
 %setup -q
@@ -27,7 +32,7 @@ lrelease -silent translations/*.ts
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}%{_datadir}/%{name}
-cp -r qml python %{buildroot}%{_datadir}/%{name}/
+cp -r qml python lib %{buildroot}%{_datadir}/%{name}/
 mkdir -p %{buildroot}%{_datadir}/%{name}/translations
 cp translations/*.qm %{buildroot}%{_datadir}/%{name}/translations/
 install -D -m 644 %{name}.desktop %{buildroot}%{_datadir}/applications/%{name}.desktop
