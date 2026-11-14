@@ -43,11 +43,15 @@ WebViewPage {
     Rectangle {
         id: toolbar
         anchors { left: parent.left; right: parent.right; top: parent.top }
-        height: Theme.itemSizeSmall
+        // Hauteur de l'encoche fournie par Sailfish ; marge fixe si elle est inconnue.
+        readonly property real cutout: {
+            try { return Screen.topCutout.height || 0 } catch (e) { return 0 }
+        }
+        height: Theme.itemSizeSmall + (cutout > 0 ? cutout : Theme.paddingLarge * 2)
         color: Theme.rgba(Theme.overlayBackgroundColor, 0.9)
 
         Row {   // avant l'encoche, apres la fleche de Sailfish
-            anchors { left: parent.left; leftMargin: Theme.itemSizeMedium; verticalCenter: parent.verticalCenter }
+            anchors { left: parent.left; leftMargin: Theme.itemSizeMedium; bottom: parent.bottom }
             IconButton {
                 icon.source: "image://theme/icon-m-back"
                 enabled: web.canGoBack
@@ -60,7 +64,7 @@ WebViewPage {
             }
         }
         Row {   // apres l'encoche
-            anchors { right: parent.right; rightMargin: Theme.paddingMedium; verticalCenter: parent.verticalCenter }
+            anchors { right: parent.right; rightMargin: Theme.paddingMedium; bottom: parent.bottom }
             IconButton {
                 icon.source: "image://theme/icon-m-refresh"
                 onClicked: web.reload()
