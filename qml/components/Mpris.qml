@@ -22,6 +22,11 @@ MprisPlayer {
     metaData.title: app.book ? app.book.title : ""
     metaData.contributingArtist: app.book ? app.book.authors : ""
     metaData.albumTitle: app.chapterIndex >= 0 ? app.chapters[app.chapterIndex].title : ""
+    // Couverture affichee sur l'ecran verrouille et dans les commandes multimedias.
+    metaData.artUrl: !app.book || !app.book.cover ? ""
+                     : (app.book.cover.indexOf("http") === 0 ? app.book.cover
+                                                             : "file://" + app.book.cover)
+    metaData.duration: app.totalMs()
 
     onPlayRequested: app.play()
     onPauseRequested: app.pause()
