@@ -38,8 +38,8 @@ WebViewPage {
         height: Theme.paddingSmall
     }
 
-    // Barre du haut. A gauche, la fleche de Sailfish (fermer la page) reste en
-    // place ; nos boutons sont places de part et d'autre de l'encoche.
+    // Barre du haut. La fleche de Sailfish (fermer la page) reste en haut a
+    // gauche ; nos boutons sont sous l'encoche, repartis sur toute la largeur.
     Rectangle {
         id: toolbar
         anchors { left: parent.left; right: parent.right; top: parent.top }
@@ -50,22 +50,24 @@ WebViewPage {
         height: Theme.itemSizeSmall + (cutout > 0 ? cutout : Theme.paddingLarge * 2)
         color: Theme.rgba(Theme.overlayBackgroundColor, 0.9)
 
-        Row {   // avant l'encoche, apres la fleche de Sailfish
-            anchors { left: parent.left; leftMargin: Theme.itemSizeMedium; bottom: parent.bottom }
+        Row {   // sous l'encoche, boutons repartis a parts egales sur la largeur
+            readonly property int count: 3
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            height: Theme.itemSizeSmall
             IconButton {
+                width: parent.width / parent.count; height: parent.height
                 icon.source: "image://theme/icon-m-back"
                 enabled: web.canGoBack
                 onClicked: web.goBack()
             }
             IconButton {
+                width: parent.width / parent.count; height: parent.height
                 icon.source: "image://theme/icon-m-forward"
                 enabled: web.canGoForward
                 onClicked: web.goForward()
             }
-        }
-        Row {   // apres l'encoche
-            anchors { right: parent.right; rightMargin: Theme.paddingMedium; bottom: parent.bottom }
             IconButton {
+                width: parent.width / parent.count; height: parent.height
                 icon.source: "image://theme/icon-m-refresh"
                 onClicked: web.reload()
             }
