@@ -301,7 +301,12 @@ ApplicationWindow {
         onStatusChanged: if (status === Loader.Error) console.log("Nemo.DBus indisponible")
     }
 
-    Loader {  // boutons des ecouteurs, ecran verrouille (MPRIS) si disponible
+    Loader {  // boutons des ecouteurs (ressource HeadsetButtons de Sailfish)
+        source: "components/HeadsetKeys.qml"
+        onStatusChanged: if (status === Loader.Error) console.log("Boutons des ecouteurs indisponibles")
+    }
+
+    Loader {  // ecran verrouille et voiture (MPRIS), si disponible
         source: "components/Mpris.qml"
         onStatusChanged: if (status === Loader.Error) console.log("MPRIS indisponible")
     }

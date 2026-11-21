@@ -37,7 +37,7 @@ sync with the official Audible apps on your other devices.
 Download the RPM from the releases page and install it:
 
 ```bash
-devel-su pkcon install-local harbour-audiobook-0.8.4-1.aarch64.rpm
+devel-su pkcon install-local harbour-audiobook-0.9.1-1.aarch64.rpm
 ```
 
 The Python modules the app needs (audible, snowcrypt and their dependencies)

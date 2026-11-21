@@ -1,5 +1,5 @@
 Name:       harbour-audiobook
-Version:    0.9.0
+Version:    0.9.1
 Release:    1
 Summary:    Audiobook, client natif pour Audible sur Sailfish OS
 License:    AGPL-3.0-or-later
