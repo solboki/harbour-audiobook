@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.solboki.AudiobookApp
+Exec=/usr/bin/sailfish-qml harbour-audiobook

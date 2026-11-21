@@ -281,6 +281,26 @@ ApplicationWindow {
         }
     }
 
+    // Livre demande depuis la voiture (Sailplay) : lu des que le moteur est pret.
+    property string remoteAsin: ""
+    property bool remoteRequested: false   // la voiture a choisi un livre : ne pas recharger le dernier
+    function playFromRemote(asin) {
+        remoteRequested = true
+        if (!backendReady) { remoteAsin = asin; return }
+        if (book && book.asin === asin) { play(); return }
+        openBook(asin, true)
+    }
+    onBackendReadyChanged: if (backendReady && remoteAsin !== "") {
+        var asin = remoteAsin
+        remoteAsin = ""
+        playFromRemote(asin)
+    }
+
+    Loader {  // service D-Bus pour Sailplay, si Nemo.DBus est disponible
+        source: "components/DBusControl.qml"
+        onStatusChanged: if (status === Loader.Error) console.log("Nemo.DBus indisponible")
+    }
+
     Loader {  // boutons des ecouteurs, ecran verrouille (MPRIS) si disponible
         source: "components/Mpris.qml"
         onStatusChanged: if (status === Loader.Error) console.log("MPRIS indisponible")

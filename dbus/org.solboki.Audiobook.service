@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.solboki.Audiobook
+Exec=/usr/bin/python3 /usr/share/harbour-audiobook/python/sailplay_service.py

@@ -1,5 +1,5 @@
 Name:       harbour-audiobook
-Version:    0.7.9
+Version:    0.8.0
 Release:    1
 Summary:    Audiobook, client natif pour Audible sur Sailfish OS
 License:    AGPL-3.0-or-later
@@ -35,6 +35,8 @@ mkdir -p %{buildroot}%{_datadir}/%{name}
 cp -r qml python lib %{buildroot}%{_datadir}/%{name}/
 mkdir -p %{buildroot}%{_datadir}/%{name}/translations
 cp translations/*.qm %{buildroot}%{_datadir}/%{name}/translations/
+install -D -m 644 dbus/org.solboki.Audiobook.service %{buildroot}%{_datadir}/dbus-1/services/org.solboki.Audiobook.service
+install -D -m 644 dbus/org.solboki.AudiobookApp.service %{buildroot}%{_datadir}/dbus-1/services/org.solboki.AudiobookApp.service
 install -D -m 644 %{name}.desktop %{buildroot}%{_datadir}/applications/%{name}.desktop
 for s in 86x86 108x108 128x128 172x172 256x256; do
   install -D -m 644 icons/$s/%{name}.png %{buildroot}%{_datadir}/icons/hicolor/$s/apps/%{name}.png
@@ -43,4 +45,5 @@ done
 %files
 %{_datadir}/%{name}
 %{_datadir}/applications/%{name}.desktop
+%{_datadir}/dbus-1/services/org.solboki.Audiobook*.service
 %{_datadir}/icons/hicolor/*/apps/%{name}.png

@@ -84,7 +84,8 @@ Page {
         py.call("backend.library_cached", [], function(items) {
             app.fillLibrary(items)
             // le dernier livre est charge (sans lecture) pour que le lecteur soit pret
-            if (app.settings.last_asin) app.openBook(app.settings.last_asin, false)
+            if (app.settings.last_asin && !app.book && !app.remoteRequested)
+                app.openBook(app.settings.last_asin, false)
             page.refresh()
         })
     }

@@ -19,6 +19,8 @@ Page {
           authors: "Helder Eijs", license: "BSD-2-Clause", url: "https://www.pycryptodome.org" },
         { name: "Qt, Qt Multimedia", role: qsTr("Interface and audio playback"),
           authors: qsTr("The Qt Company and contributors"), license: "LGPL-3.0", url: "https://www.qt.io" },
+        { name: "Sailplay SDK", role: qsTr("Car screen integration: browsing books from the car"),
+          authors: "0312birdzhang", license: "GPL-3.0", url: "https://github.com/0312birdzhang/harbour-sailplay" },
         { name: "Sailfish Silica, WebView, Amber MPRIS", role: qsTr("Native Sailfish OS components"),
           authors: "Jolla", license: "", url: "https://sailfishos.org" }
     ]

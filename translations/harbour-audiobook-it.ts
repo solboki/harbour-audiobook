@@ -117,6 +117,10 @@
         <translation>The Qt Company e collaboratori</translation>
     </message>
     <message>
+        <source>Car screen integration: browsing books from the car</source>
+        <translation>Integrazione con lo schermo dell'auto: scelta dei libri dall'auto</translation>
+    </message>
+    <message>
         <source>Native Sailfish OS components</source>
         <translation>Componenti nativi di Sailfish OS</translation>
     </message>
