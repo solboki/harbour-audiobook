@@ -50,7 +50,7 @@ try:
 except ImportError as e:
     MISSING.append(e.name or "snowcrypt")
 
-VERSION = "0.8.3"
+VERSION = "0.8.4"
 HOME = Path.home()
 DATA = HOME / ".local/share/harbour-audiobook"
 CACHE = HOME / ".cache/harbour-audiobook"

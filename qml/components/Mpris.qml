@@ -60,7 +60,7 @@ MprisPlayer {
     // « Ouvrir ce fichier » : utilise par le service Sailplay quand on choisit
     // un livre sur l'ecran de la voiture (bouton Parcourir).
     onOpenUriRequested: {
-        var name = ("" + url).split("/").pop()
+        var name = ("" + uri).split("/").pop()
         if (name.slice(-4) === ".m4b") app.playFromRemote(decodeURIComponent(name.slice(0, -4)))
     }
 
