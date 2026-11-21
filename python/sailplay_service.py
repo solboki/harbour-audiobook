@@ -31,7 +31,8 @@ SERVICE = "org.solboki.Audiobook"
 APPLICATION_ID = "harbour-audiobook"
 # L'application est pilotee par MPRIS (commande standard OpenUri), le canal
 # deja utilise par la voiture pour la lecture.
-MPRIS_SERVICE = "org.mpris.MediaPlayer2.harbour-audiobook"
+MPRIS_PREFIX = "org.mpris.MediaPlayer2."
+DESKTOP_ENTRY = "harbour-audiobook"
 MPRIS_PATH = "/org/mpris/MediaPlayer2"
 MPRIS_PLAYER = "org.mpris.MediaPlayer2.Player"
 LAUNCH = ["/usr/bin/sailfish-qml", "harbour-audiobook"]
@@ -128,9 +129,25 @@ def main():
         result = page("root", parameters["offset"], parameters["limit"], parameters.get("query", ""))
         invocation.complete({"content": wire_content(result)})
 
-    def open_uri(asin, invocation):
+    def find_player():
+        """Nom du lecteur MPRIS d'Audiobook, reconnu a son DesktopEntry."""
+        for name in backend.bus.list_names():
+            name = str(name)
+            if not name.startswith(MPRIS_PREFIX):
+                continue
+            try:
+                obj = backend.bus.get_object(name, MPRIS_PATH, introspect=False)
+                entry = obj.Get("org.mpris.MediaPlayer2", "DesktopEntry",
+                                dbus_interface="org.freedesktop.DBus.Properties", timeout=2)
+            except dbus.exceptions.DBusException:
+                continue
+            if str(entry) == DESKTOP_ENTRY or name.endswith(DESKTOP_ENTRY):
+                return name
+        return None
+
+    def open_uri(service, asin, invocation):
         uri = (BOOKS / (asin + ".m4b")).as_uri()
-        player = backend.bus.get_object(MPRIS_SERVICE, MPRIS_PATH, introspect=False)
+        player = backend.bus.get_object(service, MPRIS_PATH, introspect=False)
         player.OpenUri(uri, dbus_interface=MPRIS_PLAYER, timeout=30,
                        reply_handler=lambda *a: invocation.complete({"asin": asin}),
                        error_handler=lambda e: invocation.fail("Failed", str(e)))
@@ -139,32 +156,32 @@ def main():
         asin = str(parameters.get("asin", ""))
         if not asin or not (BOOKS / (asin + ".m4b")).exists():
             raise Fault("NotFound", "book is not on the phone")
-        if backend.bus.name_has_owner(MPRIS_SERVICE):
-            open_uri(asin, invocation)
+        service = find_player()
+        if service:
+            open_uri(service, asin, invocation)
             return
         # Application arretee : on la lance, puis on attend son lecteur MPRIS.
         subprocess.Popen(LAUNCH, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True)
-        state = {"done": False}
+        state = {"done": False, "tries": 0}
 
-        def appeared(name, old, new):
-            if name == MPRIS_SERVICE and new and not state["done"]:
+        def poll():
+            if state["done"]:
+                return False
+            state["tries"] += 1
+            found = find_player()
+            if found:
                 state["done"] = True
-                watch.remove()
                 # laisse a l'application le temps de charger son moteur
-                GLib.timeout_add(1500, lambda: (open_uri(asin, invocation), False)[1])
-
-        def give_up():
-            if not state["done"]:
+                GLib.timeout_add(1500, lambda: (open_uri(found, asin, invocation), False)[1])
+                return False
+            if state["tries"] >= LAUNCH_TIMEOUT:
                 state["done"] = True
-                watch.remove()
                 invocation.fail("Failed", "Audiobook did not start")
-            return False
+                return False
+            return True
 
-        watch = backend.bus.add_signal_receiver(appeared, "NameOwnerChanged",
-                                                "org.freedesktop.DBus", "org.freedesktop.DBus",
-                                                "/org/freedesktop/DBus", arg0=MPRIS_SERVICE)
-        GLib.timeout_add_seconds(LAUNCH_TIMEOUT, give_up)
+        GLib.timeout_add_seconds(1, poll)
 
     root = page("root", 0, 50)
     root["offset"] = 0
