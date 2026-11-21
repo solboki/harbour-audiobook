@@ -5,8 +5,12 @@ import Amber.Mpris 1.0
 // Charge par un Loader : si le module Amber.Mpris manque, l'application
 // fonctionne sans.
 MprisPlayer {
+    id: mpris
     serviceName: "harbour-audiobook"
     identity: "Audiobook"
+    // Permet aux telecommandes (ecran CarPlay de Sailplay notamment) de
+    // reconnaitre l'application et de la relancer.
+    desktopEntry: "harbour-audiobook"
     supportedUriSchemes: ["file"]
     supportedMimeTypes: ["audio/mp4"]
 
@@ -15,7 +19,7 @@ MprisPlayer {
     canPause: app.book !== null
     canGoNext: app.book !== null
     canGoPrevious: app.book !== null
-    canSeek: false
+    canSeek: app.book !== null
 
     playbackStatus: app.playing ? Mpris.Playing : (app.book ? Mpris.Paused : Mpris.Stopped)
 
@@ -27,6 +31,18 @@ MprisPlayer {
                      : (app.book.cover.indexOf("http") === 0 ? app.book.cover
                                                              : "file://" + app.book.cover)
     metaData.duration: app.totalMs()
+
+    // Position dans le livre entier, en millisecondes (Amber convertit pour D-Bus).
+    // Lue a la demande, sans signal a chaque seconde de lecture.
+    onPositionRequested: position = app.positionMs()
+    onSeekRequested: {
+        app.seekTo(Math.max(0, app.positionMs() + offset))
+        mpris.seeked(app.positionMs())
+    }
+    onSetPositionRequested: {
+        app.seekTo(Math.max(0, Math.min(position, app.totalMs())))
+        mpris.seeked(app.positionMs())
+    }
 
     onPlayRequested: app.play()
     onPauseRequested: app.pause()

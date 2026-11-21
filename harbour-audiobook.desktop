@@ -4,6 +4,7 @@ Name=Audiobook
 Comment=Client natif pour Audible
 Icon=harbour-audiobook
 Exec=sailfish-qml harbour-audiobook
+Categories=AudioVideo;Audio;Player;
 X-Nemo-Application-Type=silica-qt5
 
 [X-Sailjail]

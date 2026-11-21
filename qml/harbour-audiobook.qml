@@ -177,6 +177,7 @@ ApplicationWindow {
     }
     function skip(deltaMs) { seekTo(player.position + deltaMs) }
     function totalMs() { return durationMs > 0 ? durationMs : player.duration }
+    function positionMs() { return pendingSeek >= 0 ? pendingSeek : player.position }
 
     function chapterAt(ms) {
         var idx = -1
