@@ -129,7 +129,7 @@ def main():
             raise Fault("NotFound", "book is not on the phone")
         # L'appel lance l'application si elle ne tourne pas (activation D-Bus).
         app = backend.bus.get_object(APP_SERVICE, APP_PATH)
-        app.PlayBook(asin, dbus_interface=APP_INTERFACE, timeout=60,
+        app.playBook(asin, dbus_interface=APP_INTERFACE, timeout=60,
                      reply_handler=lambda *a: invocation.complete({"asin": asin}),
                      error_handler=lambda e: invocation.fail("Failed", str(e)))
 

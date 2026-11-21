@@ -10,7 +10,7 @@ DBusAdaptor {
     path: "/app"
     iface: "org.solboki.AudiobookApp"
     xml: '<interface name="org.solboki.AudiobookApp">\n'
-         + '  <method name="PlayBook">\n'
+         + '  <method name="playBook">\n'
          + '    <arg name="asin" type="s" direction="in"/>\n'
          + '    <arg name="accepted" type="b" direction="out"/>\n'
          + '  </method>\n'
