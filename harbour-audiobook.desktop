@@ -11,7 +11,9 @@ X-Sailplay-Service=org.solboki.Audiobook
 X-Sailplay-ObjectPath=/org/sailplay/v1/App
 X-Sailplay-Presentation=template
 X-Sailplay-Capabilities=content;
-X-Sailplay-BackgroundService=org.solboki.AudiobookApp
+X-Sailplay-BackgroundService=org.solboki.harbour-audiobook
 
 [X-Sailjail]
-Sandboxing=Disabled
+OrganizationName=org.solboki
+ApplicationName=harbour-audiobook
+Permissions=Internet;Audio;Music;WebView

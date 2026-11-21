@@ -35,11 +35,13 @@ MPRIS_PREFIX = "org.mpris.MediaPlayer2."
 DESKTOP_ENTRY = "harbour-audiobook"
 MPRIS_PATH = "/org/mpris/MediaPlayer2"
 MPRIS_PLAYER = "org.mpris.MediaPlayer2.Player"
-LAUNCH = ["/usr/bin/sailfish-qml", "harbour-audiobook"]
+# Lancement dans le bac a sable de l'application, comme le fait Sailplay.
+LAUNCH = ["/usr/bin/sailjail", "-p", "harbour-audiobook.desktop", "--",
+          "/usr/bin/sailfish-qml", "harbour-audiobook"]
 LAUNCH_TIMEOUT = 40
 
 HOME = Path.home()
-DATA = HOME / ".local/share/harbour-audiobook"
+DATA = HOME / ".local/share/org.solboki/harbour-audiobook"
 BOOKS = HOME / "Music/Audible"
 IDLE_SECONDS = 10
 

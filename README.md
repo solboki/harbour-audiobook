@@ -44,7 +44,9 @@ The Python modules the app needs (audible, snowcrypt and their dependencies)
 are bundled in the package, so nothing else has to be installed. The package
 targets 64-bit devices (aarch64) running Sailfish OS 5 with Python 3.11.
 
-Sailjail sandboxing is disabled for now.
+The app runs in the Sailjail sandbox with the Internet, Audio, Music and
+WebView permissions. Its data lives in `~/.local/share/org.solboki/harbour-audiobook`;
+data from versions before 0.9 is moved there on installation.
 
 ## Building
 

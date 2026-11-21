@@ -1,12 +1,13 @@
 import QtQuick 2.6
 import Nemo.DBus 2.0
 
-// Point d'entree D-Bus de l'application, utilise par le service Sailplay
-// (bouton « Parcourir » de l'ecran de la voiture) pour lancer un livre.
+// Nom D-Bus de l'application (<organisation>.<application>, autorise par
+// Sailjail). Il sert a Sailplay pour demarrer l'application depuis la voiture
+// (activation D-Bus). Le livre choisi arrive, lui, par MPRIS (OpenUri).
 // Charge par un Loader : si Nemo.DBus manque, l'application fonctionne sans.
 DBusAdaptor {
     bus: DBus.SessionBus
-    service: "org.solboki.AudiobookApp"
+    service: "org.solboki.harbour-audiobook"
     path: "/app"
     iface: "org.solboki.AudiobookApp"
     xml: '<interface name="org.solboki.AudiobookApp">\n'

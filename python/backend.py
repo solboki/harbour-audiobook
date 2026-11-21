@@ -50,15 +50,15 @@ try:
 except ImportError as e:
     MISSING.append(e.name or "snowcrypt")
 
-VERSION = "0.8.4"
+VERSION = "0.9.0"
 HOME = Path.home()
-DATA = HOME / ".local/share/harbour-audiobook"
-CACHE = HOME / ".cache/harbour-audiobook"
+# Dossiers accordes par Sailjail : <organisation>/<application>. Les donnees des
+# versions precedentes y sont deplacees par le paquet a l'installation.
+DATA = HOME / ".local/share/org.solboki/harbour-audiobook"
+CACHE = HOME / ".cache/org.solboki/harbour-audiobook"
 COVERS = CACHE / "covers"
 BOOKS_META = DATA / "books"
 AUTH_FILE = DATA / "auth.json"
-PROBE_AUTH = HOME / ".local/share/audible-probe/auth.json"
-OLD_DATA = HOME / ".local/share/harbour-audible"   # nom des versions 0.1 a 0.5
 LIBRARY_FILE = DATA / "library.json"
 STATE_FILE = DATA / "state.json"
 SETTINGS_FILE = DATA / "settings.json"
@@ -151,16 +151,9 @@ class _Session:
 
 # ---------------------------------------------------------- demarrage
 def init():
-    if not DATA.exists() and OLD_DATA.exists():
-        # Reprise des donnees de l'ancien nom (connexion, positions, chapitres).
-        shutil.copytree(OLD_DATA, DATA)
     DATA.mkdir(parents=True, exist_ok=True)
     COVERS.mkdir(parents=True, exist_ok=True)
     BOOKS_META.mkdir(parents=True, exist_ok=True)
-    if not AUTH_FILE.exists() and PROBE_AUTH.exists():
-        # Reprise de l'identification du script de test.
-        shutil.copy2(PROBE_AUTH, AUTH_FILE)
-        os.chmod(AUTH_FILE, 0o600)
     return {
         "version": VERSION,
         "missing": ", ".join(MISSING),
