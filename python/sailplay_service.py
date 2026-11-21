@@ -3,8 +3,8 @@
 """Service Sailplay d'Audiobook : bouton « Parcourir » de la carte Musique.
 
 Expose les livres presents sur le telephone a l'ecran de la voiture (contrat
-Content1 du SDK Sailplay). Choisir un livre demande a l'application Audiobook
-de l'ouvrir et de le lire, en la lancant si besoin. Le service est demarre a
+Content1 du SDK Sailplay). Choisir un livre l'envoie a l'application par la
+commande MPRIS OpenUri, en lancant l'application si besoin. Le service est demarre a
 la demande par D-Bus et s'arrete seul apres dix secondes d'inactivite.
 
 Le SDK est fourni par Sailplay (/opt/sailplay, GPL-3.0-or-later) : sans
@@ -13,6 +13,7 @@ Sailplay, ce service ne demarre pas et l'application n'en depend pas.
 import json
 import os
 import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,9 +29,13 @@ from sailplay_sdk.model import Fault  # noqa: E402
 
 SERVICE = "org.solboki.Audiobook"
 APPLICATION_ID = "harbour-audiobook"
-APP_SERVICE = "org.solboki.AudiobookApp"   # l'application elle-meme
-APP_PATH = "/app"
-APP_INTERFACE = "org.solboki.AudiobookApp"
+# L'application est pilotee par MPRIS (commande standard OpenUri), le canal
+# deja utilise par la voiture pour la lecture.
+MPRIS_SERVICE = "org.mpris.MediaPlayer2.harbour-audiobook"
+MPRIS_PATH = "/org/mpris/MediaPlayer2"
+MPRIS_PLAYER = "org.mpris.MediaPlayer2.Player"
+LAUNCH = ["/usr/bin/sailfish-qml", "harbour-audiobook"]
+LAUNCH_TIMEOUT = 40
 
 HOME = Path.home()
 DATA = HOME / ".local/share/harbour-audiobook"
@@ -123,15 +128,43 @@ def main():
         result = page("root", parameters["offset"], parameters["limit"], parameters.get("query", ""))
         invocation.complete({"content": wire_content(result)})
 
+    def open_uri(asin, invocation):
+        uri = (BOOKS / (asin + ".m4b")).as_uri()
+        player = backend.bus.get_object(MPRIS_SERVICE, MPRIS_PATH, introspect=False)
+        player.OpenUri(uri, dbus_interface=MPRIS_PLAYER, timeout=30,
+                       reply_handler=lambda *a: invocation.complete({"asin": asin}),
+                       error_handler=lambda e: invocation.fail("Failed", str(e)))
+
     def select(parameters, invocation):
         asin = str(parameters.get("asin", ""))
         if not asin or not (BOOKS / (asin + ".m4b")).exists():
             raise Fault("NotFound", "book is not on the phone")
-        # L'appel lance l'application si elle ne tourne pas (activation D-Bus).
-        app = backend.bus.get_object(APP_SERVICE, APP_PATH)
-        app.playBook(asin, dbus_interface=APP_INTERFACE, timeout=60,
-                     reply_handler=lambda *a: invocation.complete({"asin": asin}),
-                     error_handler=lambda e: invocation.fail("Failed", str(e)))
+        if backend.bus.name_has_owner(MPRIS_SERVICE):
+            open_uri(asin, invocation)
+            return
+        # Application arretee : on la lance, puis on attend son lecteur MPRIS.
+        subprocess.Popen(LAUNCH, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+        state = {"done": False}
+
+        def appeared(name, old, new):
+            if name == MPRIS_SERVICE and new and not state["done"]:
+                state["done"] = True
+                watch.remove()
+                # laisse a l'application le temps de charger son moteur
+                GLib.timeout_add(1500, lambda: (open_uri(asin, invocation), False)[1])
+
+        def give_up():
+            if not state["done"]:
+                state["done"] = True
+                watch.remove()
+                invocation.fail("Failed", "Audiobook did not start")
+            return False
+
+        watch = backend.bus.add_signal_receiver(appeared, "NameOwnerChanged",
+                                                "org.freedesktop.DBus", "org.freedesktop.DBus",
+                                                "/org/freedesktop/DBus", arg0=MPRIS_SERVICE)
+        GLib.timeout_add_seconds(LAUNCH_TIMEOUT, give_up)
 
     root = page("root", 0, 50)
     root["offset"] = 0
