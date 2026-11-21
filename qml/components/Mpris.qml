@@ -30,18 +30,31 @@ MprisPlayer {
     metaData.artUrl: !app.book || !app.book.cover ? ""
                      : (app.book.cover.indexOf("http") === 0 ? app.book.cover
                                                              : "file://" + app.book.cover)
-    metaData.duration: app.totalMs()
+    // La voiture (Sailplay) et l'ecran verrouille travaillent sur le chapitre en
+    // cours : duree et position sont celles du chapitre, et le changement de
+    // chapitre remet la barre a zero. Sans chapitres, on retombe sur le livre.
+    readonly property bool byChapter: app.chapters.length > 0 && app.chapterIndex >= 0
+    readonly property real segStart: byChapter ? app.chapterStart(app.chapterIndex) : 0
+    readonly property real segLength: byChapter ? app.chapterEnd(app.chapterIndex) - segStart
+                                                : app.totalMs()
+    function relative(absMs) {
+        if (!byChapter) return absMs
+        return Math.max(0, absMs - app.chapterStart(app.chapterAt(absMs)))
+    }
 
-    // Position dans le livre entier, en millisecondes (Amber convertit pour D-Bus).
-    // Lue a la demande, sans signal a chaque seconde de lecture.
-    onPositionRequested: position = app.positionMs()
+    metaData.duration: segLength
+
+    // Position en millisecondes (Amber convertit pour D-Bus), lue a la demande.
+    onPositionRequested: position = Math.max(0, app.positionMs() - segStart)
     onSeekRequested: {
-        app.seekTo(Math.max(0, app.positionMs() + offset))
-        mpris.seeked(app.positionMs())
+        var target = Math.max(0, app.positionMs() + offset)
+        app.seekTo(target)
+        mpris.seeked(relative(target))
     }
     onSetPositionRequested: {
-        app.seekTo(Math.max(0, Math.min(position, app.totalMs())))
-        mpris.seeked(app.positionMs())
+        var target = segStart + Math.max(0, Math.min(position, segLength))
+        app.seekTo(target)
+        mpris.seeked(relative(target))
     }
 
     onPlayRequested: app.play()
