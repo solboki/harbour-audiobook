@@ -3,8 +3,8 @@ Version:    0.9.1
 Release:    1
 Summary:    Audiobook, client natif pour Audible sur Sailfish OS
 License:    AGPL-3.0-or-later
-# Les modules Python embarques contiennent du code compile (pycryptodome).
-BuildArch:  aarch64
+# Les modules Python embarques contiennent du code compile (pycryptodome) :
+# un paquet par architecture (aarch64, armv7hl, i486), choisie par --target.
 AutoReqProv: no
 %global debug_package %{nil}
 %global __strip /bin/true

@@ -37,12 +37,14 @@ sync with the official Audible apps on your other devices.
 Download the RPM from the releases page and install it:
 
 ```bash
-devel-su pkcon install-local harbour-audiobook-0.9.1-1.aarch64.rpm
+devel-su pkcon install-local harbour-audiobook-0.9.1-1.<arch>.rpm
 ```
 
 The Python modules the app needs (audible, snowcrypt and their dependencies)
-are bundled in the package, so nothing else has to be installed. The package
-targets 64-bit devices (aarch64) running Sailfish OS 5 with Python 3.11.
+are bundled in the package, so nothing else has to be installed. Packages are
+provided for the three Sailfish OS architectures: `aarch64` (64-bit ARM, such as
+the Jolla Phone), `armv7hl` (32-bit ARM) and `i486` (Intel tablets). Pick the
+one matching `uname -m` on your device (`armv7l` means `armv7hl`).
 
 The app runs in the Sailjail sandbox with the Internet, Audio, Music and
 WebView permissions. Its data lives in `~/.local/share/org.solboki/harbour-audiobook`;
@@ -54,10 +56,16 @@ The app itself is QML and Python, so it builds without the Sailfish SDK, on
 any machine with `rpmbuild`, `pip` and Qt's `lrelease`:
 
 ```bash
-sh tools/vendor.sh               # fetches the bundled Python modules into lib/
-python3 tools/build_ts.py        # regenerates the translation files
-rpmbuild --target aarch64 -bb harbour-audiobook.spec
+sh tools/vendor.sh aarch64       # fetches the bundled Python modules into lib/
+sh tools/build-rpm.sh aarch64    # builds the RPM (translations included)
 ```
+
+For `armv7hl` and `i486`, PyCryptodome has no ready-made build: it is compiled
+in a Debian 10 container (`tools/build-crypto.sh`, needs Docker, and QEMU for
+ARM), then passed to `tools/vendor.sh` through `CRYPTO_WHEEL`. The GitHub
+Actions workflow in `.github/workflows/build.yml` does all of this for the
+three architectures on every push, and attaches the packages to the release
+on every `v*` tag.
 
 Pillow, used by the audible module only to display a CAPTCHA during password
 sign-in, is replaced by an empty stub: the app signs in through the browser.

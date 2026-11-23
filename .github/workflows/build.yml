@@ -1,0 +1,65 @@
+# Construit le paquet pour les trois architectures de Sailfish OS a chaque
+# envoi de code (paquets disponibles dans les « artifacts » de l'execution).
+# A chaque etiquette « v* », les trois paquets sont aussi joints a la Release.
+name: Build RPM
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, armv7hl, i486]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q rpm qttools5-dev-tools
+
+      - name: Set up QEMU (32-bit ARM emulation)
+        if: matrix.arch == 'armv7hl'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+
+      - name: Build PyCryptodome for ${{ matrix.arch }}
+        if: matrix.arch != 'aarch64'
+        run: |
+          wheel=$(sh tools/build-crypto.sh ${{ matrix.arch }} build-crypto)
+          echo "CRYPTO_WHEEL=$wheel" >> "$GITHUB_ENV"
+
+      - name: Bundle the Python modules
+        run: sh tools/vendor.sh ${{ matrix.arch }}
+
+      - name: Build the RPM
+        run: sh tools/build-rpm.sh ${{ matrix.arch }} dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-${{ matrix.arch }}
+          path: dist/*.rpm
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rpm-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.rpm
