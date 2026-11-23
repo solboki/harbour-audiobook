@@ -29,7 +29,7 @@ sync with the official Audible apps on your other devices.
   books on the phone first, and starts the chosen one, downloading it first if
   needed. With a Sailplay that supports presentation hints, books are shown as
   cards with their cover and playback status, under tabs (In progress,
-  Downloaded, New, Authors, All). The progress bar follows the current chapter.
+  Downloaded, New, Authors, Genres, Not on phone). The progress bar follows the current chapter.
 - Audible store in the built-in browser or in the system browser.
 - Interface in English, French, German, Spanish, Italian, Dutch, Swedish,
   Finnish, Polish and Russian.

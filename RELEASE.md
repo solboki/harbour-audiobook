@@ -4,17 +4,19 @@
 
 The Browse button of [Sailplay](https://github.com/0312birdzhang/harbour-sailplay) now lists the whole library, not only the books on the phone:
 
-- touching a book that is not on the phone downloads it, then plays it; such books are marked with "↓", then "Downloading…";
+- touching a book that is not on the phone downloads it, then plays it; such books are marked with "↓";
+- a book being downloaded shows "Downloading…" and already counts as a book on the phone;
 - books on the phone always come first.
 
 With a Sailplay that supports the experimental presentation hints of the Browse page, books are shown as large cards, easy to read and to pick while driving:
 
-- tabs at the top: In progress, Downloaded, New, Authors, All (a tab only appears when it has something to show);
+- tabs at the top: In progress, Downloaded, New, Authors, Genres, Not on phone (a tab only appears when it has something to show);
 - one card per book with its cover, author and progress, and a badge for its playback status: not started, started, playing, finished;
+- one card per author and per genre, showing several covers of their books;
 - the book being played is highlighted, and the page follows playback and downloads;
 - search covers titles, authors and series.
 
-With other versions of Sailplay, the Browse button shows a simple list.
+Genres appear after the library has been refreshed once in the app (pull down in the library). With other versions of Sailplay, the Browse button shows a simple list.
 
 ### Reminder of the main features
 

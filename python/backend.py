@@ -296,9 +296,10 @@ def library_refresh():
     return True
 
 
-# « media » fournit les couvertures (product_images) avec le parametre image_sizes.
+# « media » fournit les couvertures (product_images) avec le parametre image_sizes,
+# « category_ladders » les genres (utilises par la page de la voiture).
 LIBRARY_GROUPS = ("product_desc", "product_attrs", "contributors", "media", "series",
-                  "percent_complete", "is_finished")
+                  "percent_complete", "is_finished", "category_ladders")
 
 
 def _invalid_groups(exc, groups):

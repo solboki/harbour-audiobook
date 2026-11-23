@@ -10,18 +10,20 @@ par l'application, puis lu. Le service est demarre a
 la demande par D-Bus et s'arrete seul apres dix secondes d'inactivite.
 
 Avec un Sailplay qui connait les indications de presentation, la page est
-faite d'onglets (En cours, Telecharges, Nouveautes, Auteurs, Tous) et de cartes portant la
+faite d'onglets (En cours, Telecharges, Nouveautes, Auteurs, Genres, Absents) et de cartes portant la
 couverture et le statut de lecture de chaque livre. Avec un Sailplay plus
 ancien, elle reste la liste simple des livres.
 
 Le SDK est fourni par Sailplay (/opt/sailplay, GPL-3.0-or-later) : sans
 Sailplay, ce service ne demarre pas et l'application n'en depend pas.
 """
+import hashlib
 import json
 import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from urllib.parse import unquote
@@ -63,27 +65,32 @@ HOME = Path.home()
 DATA = HOME / ".local/share/org.solboki/harbour-audiobook"
 # Lues par Sailplay, hors du bac a sable de l'application.
 COVERS = HOME / ".cache/org.solboki/harbour-audiobook/covers"
+MOSAICS = COVERS.parent / "mosaics"   # couvertures assemblees des auteurs et des genres
 BOOKS = HOME / "Music/Audible"
+FFMPEG = "/usr/bin/ffmpeg"
 IDLE_SECONDS = 10
 WATCH_SECONDS = 10   # filet de securite : telechargements, positions enregistrees
-MAX_AUTHORS = 200
+MAX_GROUPS = 200     # auteurs ou genres
+MOSAIC_SIZE = 480
+MOSAIC_DAYS = 60
 TO_DOWNLOAD = "↓ "       # devant le sous-titre d'un livre absent du telephone
 REQUEST_SECONDS = 90     # delai laisse a l'application pour commencer un telechargement
 
 # Textes de l'ecran de la voiture : courts, une ligne par onglet.
 _TEXTS = {
-    "en": ("In progress", "New", "Authors", "All", "No books on the phone", "No results", "Downloaded", "Downloading…"),
-    "fr": ("En cours", "Nouveautés", "Auteurs", "Tous", "Aucun livre sur le téléphone", "Aucun résultat", "Téléchargés", "Téléchargement…"),
-    "de": ("Begonnen", "Neu", "Autoren", "Alle", "Keine Bücher auf dem Telefon", "Keine Ergebnisse", "Geladen", "Wird geladen…"),
-    "es": ("En curso", "Novedades", "Autores", "Todos", "No hay libros en el teléfono", "Sin resultados", "Descargados", "Descargando…"),
-    "it": ("In corso", "Novità", "Autori", "Tutti", "Nessun libro sul telefono", "Nessun risultato", "Scaricati", "Download…"),
-    "nl": ("Bezig", "Nieuw", "Auteurs", "Alle", "Geen boeken op de telefoon", "Geen resultaten", "Gedownload", "Downloaden…"),
-    "sv": ("Pågående", "Nytt", "Författare", "Alla", "Inga böcker på telefonen", "Inga resultat", "Nedladdade", "Laddar ned…"),
-    "fi": ("Kesken", "Uudet", "Kirjailijat", "Kaikki", "Puhelimessa ei ole kirjoja", "Ei tuloksia", "Ladatut", "Ladataan…"),
-    "pl": ("W trakcie", "Nowe", "Autorzy", "Wszystkie", "Brak książek w telefonie", "Brak wyników", "Pobrane", "Pobieranie…"),
-    "ru": ("В процессе", "Новые", "Авторы", "Все", "В телефоне нет книг", "Ничего не найдено", "Загруженные", "Загрузка…"),
+    "en": ("In progress", "New", "Authors", "All", "No books on the phone", "No results", "Downloaded", "Downloading…", "Genres", "Not on phone"),
+    "fr": ("En cours", "Nouveautés", "Auteurs", "Tous", "Aucun livre sur le téléphone", "Aucun résultat", "Téléchargés", "Téléchargement…", "Genres", "Absents"),
+    "de": ("Begonnen", "Neu", "Autoren", "Alle", "Keine Bücher auf dem Telefon", "Keine Ergebnisse", "Geladen", "Wird geladen…", "Genres", "Nicht geladen"),
+    "es": ("En curso", "Novedades", "Autores", "Todos", "No hay libros en el teléfono", "Sin resultados", "Descargados", "Descargando…", "Géneros", "Sin descargar"),
+    "it": ("In corso", "Novità", "Autori", "Tutti", "Nessun libro sul telefono", "Nessun risultato", "Scaricati", "Download…", "Generi", "Non scaricati"),
+    "nl": ("Bezig", "Nieuw", "Auteurs", "Alle", "Geen boeken op de telefoon", "Geen resultaten", "Gedownload", "Downloaden…", "Genres", "Niet geladen"),
+    "sv": ("Pågående", "Nytt", "Författare", "Alla", "Inga böcker på telefonen", "Inga resultat", "Nedladdade", "Laddar ned…", "Genrer", "Ej nedladdade"),
+    "fi": ("Kesken", "Uudet", "Kirjailijat", "Kaikki", "Puhelimessa ei ole kirjoja", "Ei tuloksia", "Ladatut", "Ladataan…", "Lajit", "Lataamatta"),
+    "pl": ("W trakcie", "Nowe", "Autorzy", "Wszystkie", "Brak książek w telefonie", "Brak wyników", "Pobrane", "Pobieranie…", "Gatunki", "Niepobrane"),
+    "ru": ("В процессе", "Новые", "Авторы", "Все", "В телефоне нет книг", "Ничего не найдено", "Загруженные", "Загрузка…", "Жанры", "Не загружены"),
 }
-TEXT = dict(zip(("progress", "new", "authors", "all", "empty", "none", "downloaded", "downloading"),
+TEXT = dict(zip(("progress", "new", "authors", "all", "empty", "none", "downloaded", "downloading",
+                 "genres", "absent"),
                 _TEXTS.get(os.environ.get("LANG", "")[:2], _TEXTS["en"])))
 
 _cache = {}
@@ -125,8 +132,8 @@ def downloading():
 
 
 def library_books(playing="", requested=()):
-    """Toute la bibliotheque : les livres presents sur le telephone d'abord,
-    puis du plus recemment ecoute au plus ancien."""
+    """Toute la bibliotheque : les livres presents sur le telephone (ou en cours
+    de telechargement) d'abord, puis du plus recemment ecoute au plus ancien."""
     present = {p.stem for p in BOOKS.glob("*.m4b")} if BOOKS.is_dir() else set()
     loading = (downloading() | set(requested)) - present
     library = {it.get("asin"): it for it in _read_json(DATA / "library.json", [])
@@ -157,12 +164,19 @@ def library_books(playing="", requested=()):
             playback = "started" if started else "unplayed"
         progress = "100 %" if finished else ("%d %%" % min(99, round(100 * fraction)) if fraction else "")
         authors = _names(it.get("authors"))
+        genres = []
+        for entry in it.get("category_ladders") or []:
+            ladder = entry.get("ladder") if isinstance(entry, dict) else None
+            name = ladder[0].get("name") if ladder and isinstance(ladder[0], dict) else ""
+            if name and name not in genres:
+                genres.append(name)
         series = " ".join(s.get("title") or "" for s in (it.get("series") or []) if isinstance(s, dict))
         subtitle = " · ".join(x for x in (", ".join(authors), progress) if x)
         if asin in loading:
             subtitle = TEXT["downloading"]
         elif asin not in present:
             subtitle = TO_DOWNLOAD + subtitle
+        local = COVERS / (asin + ".jpg")
         books.append({
             "asin": asin,
             "title": it.get("title") or asin,
@@ -173,7 +187,11 @@ def library_books(playing="", requested=()):
             "added": str(it.get("purchase_date") or ""),
             "cover": _cover(asin, it),
             "playback": playback,
-            "downloaded": asin in present,
+            "local_cover": str(local) if local.exists() else "",
+            "genres": genres,
+            # Un livre en cours de telechargement compte deja comme telecharge.
+            "downloaded": asin in present or asin in loading,
+            "loading": asin in loading,
         })
     books.sort(key=lambda b: (not b["downloaded"], -b["played"], b["title"].casefold()))
     return books
@@ -197,16 +215,80 @@ def folder_item(identity, title, image=""):
     return content_item(identity, title[:1024], **({"image": image} if HINTS and image else {}))
 
 
-def authors_of(books):
-    """Auteurs par ordre alphabetique, avec la couverture d'un de leurs livres
-    (de preference present sur le telephone)."""
-    authors = {}
+def mosaic_target(paths):
+    name = hashlib.sha1("\n".join(paths).encode("utf-8")).hexdigest()[:20] + ".jpg"
+    return MOSAICS / name
+
+
+def make_mosaic(paths):
+    """Assemble deux a quatre couvertures en une image carree, avec ffmpeg
+    (installe avec Sailplay). Renvoie True si l'image existe a la fin."""
+    target = mosaic_target(paths)
+    if target.exists():
+        return True
+    half = MOSAIC_SIZE // 2
+    # Deux livres : deux moities ; trois : une moitie et deux quarts ; quatre : quatre quarts.
+    boxes = {2: [(0, 0, half, MOSAIC_SIZE), (half, 0, half, MOSAIC_SIZE)],
+             3: [(0, 0, half, MOSAIC_SIZE), (half, 0, half, half), (half, half, half, half)],
+             4: [(0, 0, half, half), (half, 0, half, half), (0, half, half, half), (half, half, half, half)]}[len(paths)]
+    command = [FFMPEG, "-v", "error", "-y"]
+    for path in paths:
+        command += ["-i", path]
+    parts = ["[%d]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d[p%d]" % (i, w, h, w, h, i)
+             for i, (x, y, w, h) in enumerate(boxes)]
+    parts.append("".join("[p%d]" % i for i in range(len(boxes)))
+                 + "xstack=inputs=%d:layout=%s" % (len(boxes), "|".join("%d_%d" % (x, y) for x, y, w, h in boxes)))
+    partial = target.with_suffix(".part")
+    try:
+        MOSAICS.mkdir(parents=True, exist_ok=True)
+        subprocess.run(command + ["-filter_complex", ";".join(parts), "-frames:v", "1", "-q:v", "3",
+                                  "-f", "mjpeg", str(partial)],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=20, check=True)
+        os.replace(partial, target)
+        return True
+    except Exception:
+        try:
+            partial.unlink()
+        except OSError:
+            pass
+        return False
+
+
+def clean_mosaics():
+    """Retire les images assemblees anciennes ; elles sont refaites a la demande."""
+    limit = time.time() - MOSAIC_DAYS * 86400
+    try:
+        for path in MOSAICS.iterdir():
+            if path.stat().st_mtime < limit:
+                path.unlink()
+    except OSError:
+        pass
+
+
+def author_names(book):
+    # Audible range aussi les traducteurs parmi les auteurs (« Nom — Translator »).
+    return [n[:240] for n in book["authors"] if " — " not in n and " - " not in n] or \
+        [n[:240] for n in book["authors"]]
+
+
+def genre_names(book):
+    return [n[:240] for n in book["genres"]]
+
+
+def groups_of(books, names):
+    """Auteurs ou genres par ordre alphabetique, chacun avec ses livres
+    (ceux du telephone en premier, comme dans la liste recue)."""
+    groups = {}
     for book in books:
-        # Audible range aussi les traducteurs parmi les auteurs (« Nom — Translator »).
-        names = [n for n in book["authors"] if " — " not in n and " - " not in n] or book["authors"]
-        for name in names:
-            authors.setdefault(name[:240], book["cover"])
-    return sorted(authors.items(), key=lambda entry: entry[0].casefold())[:MAX_AUTHORS]
+        for name in names(book):
+            groups.setdefault(name, []).append(book)
+    return sorted(groups.items(), key=lambda entry: entry[0].casefold())[:MAX_GROUPS]
+
+
+def group_covers(members):
+    """Couvertures (quatre au plus) a montrer sur la carte d'un auteur ou d'un genre."""
+    return [b["local_cover"] for b in members if b["local_cover"]][:4]
 
 
 def main():
@@ -216,6 +298,9 @@ def main():
     # Version des pages : augmentee quand leur contenu change, pour que la
     # voiture recharge la page affichee. Toutes les pages portent la meme.
     shown = {"version": 1, "playing": "", "signature": None, "check": 0}
+    mosaics = {"wanted": [], "failed": set(), "busy": False}
+    closing = [False]
+    waiting = set()  # livres choisis dans la voiture et pas encore telecharges
     requested = {}  # asin -> heure de la demande de telechargement faite depuis la voiture
 
     def current_books():
@@ -244,18 +329,74 @@ def main():
                             message_kind="none" if entries else "info", version=shown["version"],
                             **({"layout": layout} if HINTS else {}))
 
+    def in_progress(book):
+        # Un livre demande depuis la voiture y attend la fin de son telechargement.
+        return book["playback"] in ("playing", "started") or book["loading"]
+
+    def group_image(members):
+        """Plusieurs couvertures sur la carte ; en attendant leur assemblage, une seule."""
+        covers = group_covers(members)
+        if len(covers) > 1:
+            target = mosaic_target(covers)
+            if target.exists():
+                return str(target)
+            if os.access(FFMPEG, os.X_OK) and covers not in mosaics["wanted"] and tuple(covers) not in mosaics["failed"]:
+                mosaics["wanted"].append(covers)
+        return covers[0] if covers else next((b["cover"] for b in members if b["cover"]), "")
+
+    def build_mosaics():
+        """Assemble les images demandees hors de la boucle principale, puis
+        republie la racine pour que la voiture recharge la page avec elles."""
+        if mosaics["busy"] or not mosaics["wanted"]:
+            return
+        mosaics["busy"] = True
+        wanted, mosaics["wanted"] = mosaics["wanted"], []
+
+        def work():
+            failed = [tuple(covers) for covers in wanted if not make_mosaic(covers)]
+            GLib.idle_add(done, failed)
+
+        def done(failed):
+            mosaics["busy"] = False
+            mosaics["failed"].update(failed)
+            if len(failed) < len(wanted) and not closing[0]:
+                shown["version"] += 1
+                backend.publish({"content": page("root", 0, 50)})
+            return False
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def group_page(identity, title, books, names, offset, limit):
+        """Cartes des auteurs ou des genres ; les images ne sont faites que pour la page demandee."""
+        groups = groups_of(books, names)
+        chunk = [folder_item(identity[:-1] + ":" + name, name, group_image(members))
+                 for name, members in groups[offset:offset + limit]]
+        build_mosaics()
+        return listing(identity, title, [None] * offset + chunk + [None] * max(0, len(groups) - offset - limit),
+                       offset, limit, layout="grid")
+
+    def member_page(identity, books, names, offset, limit):
+        name = identity.split(":", 1)[1]
+        chosen = first_downloaded((b for b in books if name in names(b)), key=lambda b: b["title"].casefold())
+        if not chosen:
+            raise Fault("NotFound", "content folder is unavailable")
+        return listing(identity, name, [book_item(b) for b in chosen], offset, limit)
+
     def tabs(books):
         """Onglets de la racine : seulement ceux qui ont quelque chose a montrer."""
         folders = []
-        if any(b["playback"] in ("playing", "started") for b in books):
+        if any(in_progress(b) for b in books):
             folders.append(folder_item("progress", TEXT["progress"]))
         if any(b["downloaded"] for b in books):
             folders.append(folder_item("downloaded", TEXT["downloaded"]))
         if any(b["playback"] == "unplayed" for b in books):
             folders.append(folder_item("new", TEXT["new"]))
-        if len(authors_of(books)) > 1:
+        if len(groups_of(books, author_names)) > 1:
             folders.append(folder_item("authors", TEXT["authors"]))
-        folders.append(folder_item("all", TEXT["all"]))
+        if len(groups_of(books, genre_names)) > 1:
+            folders.append(folder_item("genres", TEXT["genres"]))
+        if any(not b["downloaded"] for b in books):
+            folders.append(folder_item("absent", TEXT["absent"]))
         return folders
 
     def root_page(books, offset=0, limit=50):
@@ -279,7 +420,7 @@ def main():
         if not HINTS:
             raise Fault("NotFound", "content folder is unavailable")
         if identity == "progress":
-            chosen = first_downloaded(b for b in books if b["playback"] in ("playing", "started"))
+            chosen = sorted((b for b in books if in_progress(b)), key=lambda b: (not b["loading"], not b["downloaded"]))
             return listing(identity, TEXT["progress"], [book_item(b) for b in chosen], offset, limit)
         if identity == "downloaded":
             chosen = [b for b in books if b["downloaded"]]
@@ -288,18 +429,17 @@ def main():
             chosen = first_downloaded((b for b in books if b["playback"] == "unplayed"),
                                       key=lambda b: b["added"], reverse=True)
             return listing(identity, TEXT["new"], [book_item(b) for b in chosen], offset, limit)
-        if identity == "all":
-            chosen = first_downloaded(books, key=lambda b: b["title"].casefold())
-            return listing(identity, TEXT["all"], [book_item(b) for b in chosen], offset, limit)
+        if identity == "absent":
+            chosen = sorted((b for b in books if not b["downloaded"]), key=lambda b: b["title"].casefold())
+            return listing(identity, TEXT["absent"], [book_item(b) for b in chosen], offset, limit)
         if identity == "authors":
-            folders = [folder_item("author:" + name, name, cover) for name, cover in authors_of(books)]
-            return listing(identity, TEXT["authors"], folders, offset, limit, layout="grid")
+            return group_page(identity, TEXT["authors"], books, author_names, offset, limit)
+        if identity == "genres":
+            return group_page(identity, TEXT["genres"], books, genre_names, offset, limit)
         if identity.startswith("author:"):
-            name = identity[len("author:"):]
-            chosen = first_downloaded((b for b in books if any(a[:240] == name for a in b["authors"])),
-                                      key=lambda b: b["title"].casefold())
-            if chosen:
-                return listing(identity, name, [book_item(b) for b in chosen], offset, limit)
+            return member_page(identity, books, author_names, offset, limit)
+        if identity.startswith("genre:"):
+            return member_page(identity, books, genre_names, offset, limit)
         raise Fault("NotFound", "content folder is unavailable")
 
     def browse(parameters, invocation):
@@ -325,11 +465,21 @@ def main():
                 return name
         return None
 
+    def selected(asin):
+        """Resultat d'un choix. Pour un livre a telecharger, on demande a la
+        voiture de rester sur la page et de montrer l'onglet « En cours », ou
+        le livre attend ; un Sailplay qui ignore cette indication n'en tient pas compte."""
+        result = {"asin": asin}
+        if asin in waiting:
+            waiting.discard(asin)
+            result["presentation"] = dbus.Dictionary({"open": "progress"}, signature="sv")
+        return result
+
     def open_uri(service, asin, invocation):
         uri = (BOOKS / (asin + ".m4b")).as_uri()
         player = backend.bus.get_object(service, MPRIS_PATH, introspect=False)
         player.OpenUri(uri, dbus_interface=MPRIS_PLAYER, timeout=30,
-                       reply_handler=lambda *a: invocation.complete({"asin": asin}),
+                       reply_handler=lambda *a: invocation.complete(selected(asin)),
                        error_handler=lambda e: invocation.fail("Failed", str(e)))
 
     def select(parameters, invocation):
@@ -341,6 +491,7 @@ def main():
             requested[asin] = time.monotonic()
             if HINTS:
                 check_soon()
+                waiting.add(asin)
         service = find_player()
         if service:
             open_uri(service, asin, invocation)
@@ -388,8 +539,8 @@ def main():
         return max(state, key=lambda asin: float(state[asin].get("updated", 0)), default="")
 
     def signature():
-        return [(b["asin"], b["playback"], b["cover"], b["title"], b["subtitle"].startswith(TO_DOWNLOAD),
-                 b["subtitle"] == TEXT["downloading"], b["authors"]) for b in current_books()]
+        return [(b["asin"], b["playback"], b["cover"], b["title"], b["downloaded"], b["loading"],
+                 b["authors"], b["genres"]) for b in current_books()]
 
     def check():
         """Republie la racine, avec une nouvelle version, quand les pages ont change."""
@@ -411,6 +562,7 @@ def main():
                               "content.select": select},
                              {"content": page("root", 0, 50)}, on_lifecycle=lifecycle)
     if HINTS:  # le statut « en lecture » suit le lecteur de l'application
+        clean_mosaics()
         shown["playing"] = playing_asin()
         shown["signature"] = signature()
         if shown["playing"]:
@@ -426,6 +578,7 @@ def main():
     try:
         loop.run()
     finally:
+        closing[0] = True
         if idle[0]:
             GLib.source_remove(idle[0])
         backend.close()
