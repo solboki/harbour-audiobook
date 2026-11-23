@@ -50,7 +50,7 @@ try:
 except ImportError as e:
     MISSING.append(e.name or "snowcrypt")
 
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 HOME = Path.home()
 # Dossiers accordes par Sailjail : <organisation>/<application>. Les donnees des
 # versions precedentes y sont deplacees par le paquet a l'installation.

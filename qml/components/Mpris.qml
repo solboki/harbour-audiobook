@@ -26,6 +26,9 @@ MprisPlayer {
     metaData.title: app.book ? app.book.title : ""
     metaData.contributingArtist: app.book ? app.book.authors : ""
     metaData.albumTitle: app.chapterIndex >= 0 ? app.chapters[app.chapterIndex].title : ""
+    // Fichier du livre : le service Sailplay y reconnait le livre en lecture
+    // pour le signaler sur l'ecran de la voiture.
+    metaData.url: app.book && app.book.path ? "file://" + encodeURI(app.book.path) : ""
     // Couverture affichee sur l'ecran verrouille et dans les commandes multimedias.
     metaData.artUrl: !app.book || !app.book.cover ? ""
                      : (app.book.cover.indexOf("http") === 0 ? app.book.cover

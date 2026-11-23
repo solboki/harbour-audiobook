@@ -26,8 +26,10 @@ sync with the official Audible apps on your other devices.
   a more recent position from another device is offered when opening a book.
 - Car screens through [Sailplay](https://github.com/0312birdzhang/harbour-sailplay): the app is listed
   as an SDK player, and the Browse button of the Music card lists the books on
-  the phone and starts the chosen one. The progress bar follows the current
-  chapter.
+  the phone and starts the chosen one. With a Sailplay that supports
+  presentation hints, books are shown as cards with their cover and playback
+  status, under tabs (In progress, New, Authors, All). The progress bar follows
+  the current chapter.
 - Audible store in the built-in browser or in the system browser.
 - Interface in English, French, German, Spanish, Italian, Dutch, Swedish,
   Finnish, Polish and Russian.
@@ -37,7 +39,7 @@ sync with the official Audible apps on your other devices.
 Download the RPM from the releases page and install it:
 
 ```bash
-devel-su pkcon install-local harbour-audiobook-0.9.2-1.<arch>.rpm
+devel-su pkcon install-local harbour-audiobook-0.9.3-1.<arch>.rpm
 ```
 
 The Python modules the app needs (audible, snowcrypt and their dependencies)
