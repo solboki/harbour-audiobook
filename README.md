@@ -25,11 +25,11 @@ sync with the official Audible apps on your other devices.
 - Listening position sync with Audible: sent on pause, every minute and on exit;
   a more recent position from another device is offered when opening a book.
 - Car screens through [Sailplay](https://github.com/0312birdzhang/harbour-sailplay): the app is listed
-  as an SDK player, and the Browse button of the Music card lists the books on
-  the phone and starts the chosen one. With a Sailplay that supports
-  presentation hints, books are shown as cards with their cover and playback
-  status, under tabs (In progress, New, Authors, All). The progress bar follows
-  the current chapter.
+  as an SDK player, and the Browse button of the Music card lists the library,
+  books on the phone first, and starts the chosen one, downloading it first if
+  needed. With a Sailplay that supports presentation hints, books are shown as
+  cards with their cover and playback status, under tabs (In progress,
+  Downloaded, New, Authors, All). The progress bar follows the current chapter.
 - Audible store in the built-in browser or in the system browser.
 - Interface in English, French, German, Spanish, Italian, Dutch, Swedish,
   Finnish, Polish and Russian.

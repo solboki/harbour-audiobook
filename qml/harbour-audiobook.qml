@@ -284,11 +284,18 @@ ApplicationWindow {
     // Livre demande depuis la voiture (Sailplay) : lu des que le moteur est pret.
     property string remoteAsin: ""
     property bool remoteRequested: false   // la voiture a choisi un livre : ne pas recharger le dernier
+    // Livre choisi dans la voiture mais absent du telephone : telecharge, puis lu.
+    property string remoteDownload: ""
     function playFromRemote(asin) {
         remoteRequested = true
         if (!backendReady) { remoteAsin = asin; return }
+        remoteDownload = ""
         if (book && book.asin === asin) { play(); return }
-        openBook(asin, true)
+        py.call("backend.is_downloaded", [asin], function(present) {
+            if (present) { openBook(asin, true); return }
+            remoteDownload = asin
+            py.call("backend.download", [asin])
+        })
     }
     onBackendReadyChanged: if (backendReady && remoteAsin !== "") {
         var asin = remoteAsin
@@ -328,10 +335,15 @@ ApplicationWindow {
             setHandler("dl_done", function(asin, path) {
                 var d = app.downloads; delete d[asin]; app.downloads = d
                 app.setItem(asin, { dlPhase: "", dlFraction: 0, downloaded: true })
+                if (asin === app.remoteDownload) {
+                    app.remoteDownload = ""
+                    app.openBook(asin, true)
+                }
             })
             setHandler("dl_error", function(asin, msg) {
                 var d = app.downloads; delete d[asin]; app.downloads = d
                 app.setItem(asin, { dlPhase: "", dlFraction: 0 })
+                if (asin === app.remoteDownload) app.remoteDownload = ""
                 if (msg) app.lastSyncError = qsTranslate("backend", msg)
             })
             setHandler("chapters", function(asin, chs, dur) {

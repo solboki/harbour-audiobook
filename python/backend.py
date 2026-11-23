@@ -509,6 +509,10 @@ def _download_job(asin):
                 pass
 
 
+def is_downloaded(asin):
+    return _book_path(asin).exists()
+
+
 def delete_book(asin):
     try:
         _book_path(asin).unlink()

@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 """Service Sailplay d'Audiobook : bouton « Parcourir » de la carte Musique.
 
-Expose les livres presents sur le telephone a l'ecran de la voiture (contrat
-Content1 du SDK Sailplay). Choisir un livre l'envoie a l'application par la
-commande MPRIS OpenUri, en lancant l'application si besoin. Le service est demarre a
+Expose la bibliotheque a l'ecran de la voiture (contrat Content1 du SDK
+Sailplay), les livres presents sur le telephone toujours en premier. Choisir
+un livre l'envoie a l'application par la commande MPRIS OpenUri, en lancant
+l'application si besoin ; un livre absent du telephone est alors telecharge
+par l'application, puis lu. Le service est demarre a
 la demande par D-Bus et s'arrete seul apres dix secondes d'inactivite.
 
 Avec un Sailplay qui connait les indications de presentation, la page est
-faite d'onglets (En cours, Nouveautes, Auteurs, Tous) et de cartes portant la
+faite d'onglets (En cours, Telecharges, Nouveautes, Auteurs, Tous) et de cartes portant la
 couverture et le statut de lecture de chaque livre. Avec un Sailplay plus
 ancien, elle reste la liste simple des livres.
 
@@ -20,6 +22,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -64,21 +67,23 @@ BOOKS = HOME / "Music/Audible"
 IDLE_SECONDS = 10
 WATCH_SECONDS = 10   # filet de securite : telechargements, positions enregistrees
 MAX_AUTHORS = 200
+TO_DOWNLOAD = "↓ "       # devant le sous-titre d'un livre absent du telephone
+REQUEST_SECONDS = 90     # delai laisse a l'application pour commencer un telechargement
 
 # Textes de l'ecran de la voiture : courts, une ligne par onglet.
 _TEXTS = {
-    "en": ("In progress", "New", "Authors", "All", "No books on the phone", "No results"),
-    "fr": ("En cours", "Nouveautés", "Auteurs", "Tous", "Aucun livre sur le téléphone", "Aucun résultat"),
-    "de": ("Begonnen", "Neu", "Autoren", "Alle", "Keine Bücher auf dem Telefon", "Keine Ergebnisse"),
-    "es": ("En curso", "Novedades", "Autores", "Todos", "No hay libros en el teléfono", "Sin resultados"),
-    "it": ("In corso", "Novità", "Autori", "Tutti", "Nessun libro sul telefono", "Nessun risultato"),
-    "nl": ("Bezig", "Nieuw", "Auteurs", "Alle", "Geen boeken op de telefoon", "Geen resultaten"),
-    "sv": ("Pågående", "Nytt", "Författare", "Alla", "Inga böcker på telefonen", "Inga resultat"),
-    "fi": ("Kesken", "Uudet", "Kirjailijat", "Kaikki", "Puhelimessa ei ole kirjoja", "Ei tuloksia"),
-    "pl": ("W trakcie", "Nowe", "Autorzy", "Wszystkie", "Brak książek w telefonie", "Brak wyników"),
-    "ru": ("В процессе", "Новые", "Авторы", "Все", "В телефоне нет книг", "Ничего не найдено"),
+    "en": ("In progress", "New", "Authors", "All", "No books on the phone", "No results", "Downloaded", "Downloading…"),
+    "fr": ("En cours", "Nouveautés", "Auteurs", "Tous", "Aucun livre sur le téléphone", "Aucun résultat", "Téléchargés", "Téléchargement…"),
+    "de": ("Begonnen", "Neu", "Autoren", "Alle", "Keine Bücher auf dem Telefon", "Keine Ergebnisse", "Geladen", "Wird geladen…"),
+    "es": ("En curso", "Novedades", "Autores", "Todos", "No hay libros en el teléfono", "Sin resultados", "Descargados", "Descargando…"),
+    "it": ("In corso", "Novità", "Autori", "Tutti", "Nessun libro sul telefono", "Nessun risultato", "Scaricati", "Download…"),
+    "nl": ("Bezig", "Nieuw", "Auteurs", "Alle", "Geen boeken op de telefoon", "Geen resultaten", "Gedownload", "Downloaden…"),
+    "sv": ("Pågående", "Nytt", "Författare", "Alla", "Inga böcker på telefonen", "Inga resultat", "Nedladdade", "Laddar ned…"),
+    "fi": ("Kesken", "Uudet", "Kirjailijat", "Kaikki", "Puhelimessa ei ole kirjoja", "Ei tuloksia", "Ladatut", "Ladataan…"),
+    "pl": ("W trakcie", "Nowe", "Autorzy", "Wszystkie", "Brak książek w telefonie", "Brak wyników", "Pobrane", "Pobieranie…"),
+    "ru": ("В процессе", "Новые", "Авторы", "Все", "В телефоне нет книг", "Ничего не найдено", "Загруженные", "Загрузка…"),
 }
-TEXT = dict(zip(("progress", "new", "authors", "all", "empty", "none"),
+TEXT = dict(zip(("progress", "new", "authors", "all", "empty", "none", "downloaded", "downloading"),
                 _TEXTS.get(os.environ.get("LANG", "")[:2], _TEXTS["en"])))
 
 _cache = {}
@@ -112,13 +117,24 @@ def _cover(asin, it):
     return remote if ok else ""
 
 
-def downloaded_books(playing=""):
-    """Livres presents sur le telephone, du plus recemment ecoute au plus ancien."""
+def downloading():
+    """Livres dont l'application ecrit le fichier en ce moment (.<asin>.<ext>.part)."""
+    if not BOOKS.is_dir():
+        return set()
+    return {p.name[1:].split(".", 1)[0] for p in BOOKS.glob(".*.part")}
+
+
+def library_books(playing="", requested=()):
+    """Toute la bibliotheque : les livres presents sur le telephone d'abord,
+    puis du plus recemment ecoute au plus ancien."""
     present = {p.stem for p in BOOKS.glob("*.m4b")} if BOOKS.is_dir() else set()
-    library = {it.get("asin"): it for it in _read_json(DATA / "library.json", [])}
+    loading = (downloading() | set(requested)) - present
+    library = {it.get("asin"): it for it in _read_json(DATA / "library.json", [])
+               if isinstance(it, dict) and it.get("asin")
+               and it.get("content_delivery_type") not in ("PodcastParent",)}
     state = _read_json(DATA / "state.json", {})
     books = []
-    for asin in present:
+    for asin in present | set(library):
         it = library.get(asin, {})
         st = state.get(asin, {})
         runtime_ms = int(it.get("runtime_length_min") or 0) * 60000
@@ -142,19 +158,32 @@ def downloaded_books(playing=""):
         progress = "100 %" if finished else ("%d %%" % min(99, round(100 * fraction)) if fraction else "")
         authors = _names(it.get("authors"))
         series = " ".join(s.get("title") or "" for s in (it.get("series") or []) if isinstance(s, dict))
+        subtitle = " · ".join(x for x in (", ".join(authors), progress) if x)
+        if asin in loading:
+            subtitle = TEXT["downloading"]
+        elif asin not in present:
+            subtitle = TO_DOWNLOAD + subtitle
         books.append({
             "asin": asin,
             "title": it.get("title") or asin,
             "authors": authors,
-            "subtitle": " · ".join(x for x in (", ".join(authors), progress) if x),
+            "subtitle": subtitle,
             "search": " ".join([it.get("title") or "", series] + authors).casefold(),
             "played": float(st.get("updated", 0)),
             "added": str(it.get("purchase_date") or ""),
             "cover": _cover(asin, it),
             "playback": playback,
+            "downloaded": asin in present,
         })
-    books.sort(key=lambda b: (-b["played"], b["title"].casefold()))
+    books.sort(key=lambda b: (not b["downloaded"], -b["played"], b["title"].casefold()))
     return books
+
+
+def first_downloaded(books, key=None, reverse=False):
+    """Tri d'une page : les livres presents sur le telephone restent en tete."""
+    if key is not None:
+        books = sorted(books, key=key, reverse=reverse)
+    return sorted(books, key=lambda b: not b["downloaded"])
 
 
 def book_item(book):
@@ -169,7 +198,8 @@ def folder_item(identity, title, image=""):
 
 
 def authors_of(books):
-    """Auteurs par ordre alphabetique, avec la couverture de leur livre le plus recent."""
+    """Auteurs par ordre alphabetique, avec la couverture d'un de leurs livres
+    (de preference present sur le telephone)."""
     authors = {}
     for book in books:
         # Audible range aussi les traducteurs parmi les auteurs (« Nom — Translator »).
@@ -186,6 +216,13 @@ def main():
     # Version des pages : augmentee quand leur contenu change, pour que la
     # voiture recharge la page affichee. Toutes les pages portent la meme.
     shown = {"version": 1, "playing": "", "signature": None, "check": 0}
+    requested = {}  # asin -> heure de la demande de telechargement faite depuis la voiture
+
+    def current_books():
+        limit = time.monotonic() - REQUEST_SECONDS
+        for asin in [a for a, moment in requested.items() if moment < limit]:
+            del requested[asin]
+        return library_books(shown["playing"], requested)
 
     def lifecycle(backend):
         if idle[0]:
@@ -212,6 +249,8 @@ def main():
         folders = []
         if any(b["playback"] in ("playing", "started") for b in books):
             folders.append(folder_item("progress", TEXT["progress"]))
+        if any(b["downloaded"] for b in books):
+            folders.append(folder_item("downloaded", TEXT["downloaded"]))
         if any(b["playback"] == "unplayed" for b in books):
             folders.append(folder_item("new", TEXT["new"]))
         if len(authors_of(books)) > 1:
@@ -230,7 +269,7 @@ def main():
                             version=shown["version"], tabs=True)
 
     def page(identity, offset, limit, query=""):
-        books = downloaded_books(shown["playing"])
+        books = current_books()
         if query:
             q = query.casefold()
             found = [book_item(b) for b in books if q in b["search"]]
@@ -240,22 +279,25 @@ def main():
         if not HINTS:
             raise Fault("NotFound", "content folder is unavailable")
         if identity == "progress":
-            chosen = [b for b in books if b["playback"] in ("playing", "started")]
+            chosen = first_downloaded(b for b in books if b["playback"] in ("playing", "started"))
             return listing(identity, TEXT["progress"], [book_item(b) for b in chosen], offset, limit)
+        if identity == "downloaded":
+            chosen = [b for b in books if b["downloaded"]]
+            return listing(identity, TEXT["downloaded"], [book_item(b) for b in chosen], offset, limit)
         if identity == "new":
-            chosen = sorted((b for b in books if b["playback"] == "unplayed"),
-                            key=lambda b: b["added"], reverse=True)
+            chosen = first_downloaded((b for b in books if b["playback"] == "unplayed"),
+                                      key=lambda b: b["added"], reverse=True)
             return listing(identity, TEXT["new"], [book_item(b) for b in chosen], offset, limit)
         if identity == "all":
-            chosen = sorted(books, key=lambda b: b["title"].casefold())
+            chosen = first_downloaded(books, key=lambda b: b["title"].casefold())
             return listing(identity, TEXT["all"], [book_item(b) for b in chosen], offset, limit)
         if identity == "authors":
             folders = [folder_item("author:" + name, name, cover) for name, cover in authors_of(books)]
             return listing(identity, TEXT["authors"], folders, offset, limit, layout="grid")
         if identity.startswith("author:"):
             name = identity[len("author:"):]
-            chosen = sorted((b for b in books if any(a[:240] == name for a in b["authors"])),
-                            key=lambda b: b["title"].casefold())
+            chosen = first_downloaded((b for b in books if any(a[:240] == name for a in b["authors"])),
+                                      key=lambda b: b["title"].casefold())
             if chosen:
                 return listing(identity, name, [book_item(b) for b in chosen], offset, limit)
         raise Fault("NotFound", "content folder is unavailable")
@@ -292,8 +334,13 @@ def main():
 
     def select(parameters, invocation):
         asin = str(parameters.get("asin", ""))
-        if not asin or not (BOOKS / (asin + ".m4b")).exists():
-            raise Fault("NotFound", "book is not on the phone")
+        if not asin or "/" in asin or not any(b["asin"] == asin for b in current_books()):
+            raise Fault("NotFound", "book is not in the library")
+        if not (BOOKS / (asin + ".m4b")).exists():
+            # L'application le telecharge puis le lit ; la page l'annonce des maintenant.
+            requested[asin] = time.monotonic()
+            if HINTS:
+                check_soon()
         service = find_player()
         if service:
             open_uri(service, asin, invocation)
@@ -341,8 +388,8 @@ def main():
         return max(state, key=lambda asin: float(state[asin].get("updated", 0)), default="")
 
     def signature():
-        return [(b["asin"], b["playback"], b["cover"], b["title"], b["authors"])
-                for b in downloaded_books(shown["playing"])]
+        return [(b["asin"], b["playback"], b["cover"], b["title"], b["subtitle"].startswith(TO_DOWNLOAD),
+                 b["subtitle"] == TEXT["downloading"], b["authors"]) for b in current_books()]
 
     def check():
         """Republie la racine, avec une nouvelle version, quand les pages ont change."""

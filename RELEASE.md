@@ -1,15 +1,20 @@
 ## Audiobook 0.9.3
 
-### New: covers, playback status and tabs on the car screen
+### New: the whole library on the car screen, with covers, playback status and tabs
 
-The Browse button of [Sailplay](https://github.com/0312birdzhang/harbour-sailplay) now shows the books on the phone as large cards, easy to read and to pick while driving:
+The Browse button of [Sailplay](https://github.com/0312birdzhang/harbour-sailplay) now lists the whole library, not only the books on the phone:
 
-- tabs at the top: In progress, New, Authors, All (a tab only appears when it has something to show);
+- touching a book that is not on the phone downloads it, then plays it; such books are marked with "↓", then "Downloading…";
+- books on the phone always come first.
+
+With a Sailplay that supports the experimental presentation hints of the Browse page, books are shown as large cards, easy to read and to pick while driving:
+
+- tabs at the top: In progress, Downloaded, New, Authors, All (a tab only appears when it has something to show);
 - one card per book with its cover, author and progress, and a badge for its playback status: not started, started, playing, finished;
-- the book being played is highlighted, and the page follows playback;
-- touching a card starts the book; search covers titles, authors and series.
+- the book being played is highlighted, and the page follows playback and downloads;
+- search covers titles, authors and series.
 
-This needs a Sailplay that supports the experimental presentation hints of the Browse page. With other versions of Sailplay, the Browse button keeps showing the simple list of books, as before.
+With other versions of Sailplay, the Browse button shows a simple list.
 
 ### Reminder of the main features
 
